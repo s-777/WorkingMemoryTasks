@@ -34,12 +34,23 @@ var max_level = 0;
 var EvenOddArray = [1,1,1,1,2,2,2,2];
 var SequencePairOrder = jsPsych.randomization.sampleWithReplacement(EvenOddArray, 8);
 
-//An array of all of the digits that participants have typed so far in the current trail
+//An array of all of the digits that participants have typed so far in the current trial
 let fullResponse = Array();
 
 //Variable to sum the reaction times as each digit is entered
 var totalTrialRT = 0;
 
+//Variable to hold the current response (current digit typed by participant)
+var currentResponse;
+
+//Variable for the current number of digits participants are remembering
+var currentNumberDigits = 0;
+
+//Variable for which digit (first, second, third) we're having participants enter right now
+var currentDigit = 0;
+
+//How many incorrect
+var currentIncorrect = 0;
 
 
 // activity tracking
@@ -65,6 +76,7 @@ var arraysEqual = function (arr1, arr2) {
 
 var setStims = function (num_digits, number_of_responses) {
 	stimSeq_html = [];
+	console.log("Original SequencePairOrder for this number of digits: " + JSON.stringify(SequencePairOrder[num_digits-2]));
     switch (num_digits) {
 	  case 2:
 		//check if the number is even, meaning it's the first time for this number of digits
@@ -78,7 +90,7 @@ var setStims = function (num_digits, number_of_responses) {
             5 + '</div></div>');
             //Add one so that the next time, it's the opposite (odd to even or even to odd).
             SequencePairOrder[num_digits-2] = SequencePairOrder[num_digits-2]+3;
-// 			alert("Current number for digit sequence " + JSON.stringify(num_digits) + " (even or odd) AFTER display:" + JSON.stringify(SequencePairOrder[num_digits-2]));
+            console.log("Current SequencePairOrder for this number of digits: " + JSON.stringify(SequencePairOrder[num_digits-2]));
 		}
 		// if the number is odd, meaning it should display the second order
 		else {
@@ -91,7 +103,7 @@ var setStims = function (num_digits, number_of_responses) {
             6 + '</div></div>');
             //Add one so that the next time, it's the opposite (odd to even or even to odd).
             SequencePairOrder[num_digits-2] = SequencePairOrder[num_digits-2]+3;
-// 			alert("Current number for digit sequence " + JSON.stringify(num_digits) + " (even or odd) AFTER display:" + JSON.stringify(SequencePairOrder[num_digits-2]));
+            console.log("Current SequencePairOrder for this number of digits: " + JSON.stringify(SequencePairOrder[num_digits-2]));
 		}
 		break;
 	  case 3:
@@ -374,20 +386,6 @@ var setStims = function (num_digits, number_of_responses) {
             SequencePairOrder[num_digits-2] = SequencePairOrder[num_digits-2]+3;
 		}
 	}
-// 	alert(JSON.stringify(curr_stimSeq));
-/* 
-    if (num_digits > 9) {
-        var nums = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    } else {
-        var nums = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-    }
-    curr_stimSeq = jsPsych.randomization.sampleWithoutReplacement(nums, num_digits);
-    stimSeq_html = [];
-    for (var ii = 0; ii < num_digits; ii++) {
-        stimSeq_html.push('<div class = centerbox><div class = digit-span-text>' +
-            curr_stimSeq[ii] + '</div></div>');
-    }
- */
 }
 
 var getTestText = function () {
@@ -399,7 +397,11 @@ var getStims = function () {
 }
 
 var getFeedback = function () {
-    return ['<div class = centerbox><div class = center-text>' + feedback + '</div></div>'];
+	if (currentNumberDigits == 2) {
+		return ['<div class = centerbox><div class = center-text>' + feedback + '</div></div>'];
+    } else {
+		return ['<div class = centerbox><div class = center-text> Click "Next" to continue. </div></div>'];
+    }
 }
 
 function save_data() { // CHECK THE URL before use
@@ -500,92 +502,108 @@ function generate_backward_block_fixed(digit_sequence) {
             on_finish: function () {
                 jsPsych.data.addDataToLastTrial({
                     "stimSeq": curr_stimSeq
-                })
+                });
+                totalTrialRT = 0;
+                currentNumberDigits = digit_sequence[corr_history.length];
+                currentDigit = 0;
+                //currentIncorrect = 0;
+                console.log('currentNumberDigits and currentDigit: ', currentNumberDigits, currentDigit);
             }
         };
         block_sequence.push(show_digits_page);
 
 		//Get a keyboard response (have them type one key) for each digit of the current sequence.
-		totalTrialRT = 0;
-		for (var ii = 0; ii < digit_sequence.length; ii++) {
+		var oneDigitFromParticipant = {
+			type: 'html-keyboard-response',
+			stimulus: '<p>Please type each digit in the reverse order that you saw it.</p>',
+            data: {
+                exp_stage: "get_digit_from_participant_digit_equals" + currentDigit.toString()
+            },
+			choices: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+// 			prompt: '<p>Just type the numbers themselves, one by one. <BR> So far you have typed the following: </p>' + JSON.stringify(fullResponse),
+			prompt: function(){
+			  return "<p>Just type the numbers themselves, one by one. <BR> So far you have typed the following: </p>" + fullResponse.toString().replace(/,/g, ', ');
+			},
+			
+			on_finish: function (data) {			
+				//keep track of digits typed
+				currentResponse = data.response;
+				fullResponse.push(data.response);
+				totalTrialRT = totalTrialRT + data.rt;
+                currentDigit = currentDigit+1;
+				console.log("Response for digit " + currentDigit.toString() + ": " + JSON.stringify(currentResponse) + ", fullResponse = " + JSON.stringify(fullResponse) + " totalTrialRT = " + totalTrialRT.toString());
 
-			var digit_response_page = {
-	/* 
-				type: 'numpad-response',
-				post_trial_duration: 500,
-	 */
-				type: 'html-keyboard-response',
-				stimulus: '<p>Please type each digit in the reverse order that you saw it.</p>',
-				choices: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-				prompt: '<p>Just type the numbers themselves, one by one.</p>',
-				
-				on_finish: function (data) {			
-					//keep track of digits typed
-					fullResponse.push(data.response);
-					totalTrialRT = totalTrialRT + data.rt;
-				}
-				
-/* 
-				data: {
-					exp_stage: "get_backward_response_" + ii.toString()
-				},
-				on_finish: function (data) {
-					response = data.digit_response;
-					rt_history.push(data.rt);
-
-					reversedResponse = response.reverse();
-	// 				alert(JSON.stringify(reversedResponse);
-	// 				alert("Response reversed:" + JSON.stringify(reversedResponse));
-					var correct = arraysEqual(reversedResponse, curr_stimSeq);
-					corr_history.push(correct);
-					if (correct) {
-						feedback = '<span style="color:green">Correct!</span>';
-						if (max_level < digit_sequence[corr_history.length]) {
-							max_level = digit_sequence[corr_history.length];
-						}
-					} else {
-						feedback = '<span style="color:red">Incorrect</span>';
-					}
-					jsPsych.data.addDataToLastTrial({
-						"stimSeq": curr_stimSeq,
-						"condition": "reverse",
-						"correct": correct
-					});
-				}
- */
-			};
-			alert("Response for digit" + ii.toString() + ":" + JSON.stringify(data.response) + ", fullResponse = " + JSON.stringify(fullResponse) + "totalTrialRT = " + totalTrialRT.toString());
-			block_sequence.push(digit_response_page);
-		}
-		
-		//Now that we have the full sequence, we can evaluate if it's correct and save it.	
-		response = fullResponse;
-		rt_history.push(totalTrialRT);
-
-		reversedResponse = response.reverse();
-// 				alert(JSON.stringify(reversedResponse);
-// 				alert("Response reversed:" + JSON.stringify(reversedResponse));
-		var correct = arraysEqual(reversedResponse, curr_stimSeq);
-		corr_history.push(correct);
-		if (correct) {
-			feedback = '<span style="color:green">Correct!</span>';
-			if (max_level < digit_sequence[corr_history.length]) {
-				max_level = digit_sequence[corr_history.length];
 			}
-		} else {
-			feedback = '<span style="color:red">Incorrect</span>';
-		}
-		jsPsych.data.addDataToLastTrial({
-			"stimSeq": curr_stimSeq,
-			"condition": "reverse",
-			"correct": correct,
-			"sequenceEntered": fullResponse
-		});
+		};
 		
-		//Now that we're done with the currently entered sequence from the participant, clear it for the next trial.
-		fullResponse = [];
+		var fullResponseFromParticipant = {
+			timeline: [oneDigitFromParticipant],
+			loop_function: function(data){
+				console.log('In loop_node, currentDigit: ', currentDigit);
+				if(currentDigit !== currentNumberDigits){
+					return true;
+				} else {
+					return false;
+				}
+			}
+		}
+ 		block_sequence.push(fullResponseFromParticipant);
 
+		//Show the last typed digit and wrap things up.
+		var AfterFinalDigitFromParticipant = {
+			type: 'html-keyboard-response',
+			stimulus: '<p>Please type each digit in the reverse order that you saw it.</p>',
+            data: {
+                exp_stage: "full_response_received_for_X_digits_equals" + currentNumberDigits.toString()
+            },
+			choices: jsPsych.NO_KEYS,
+			prompt: function(){
+			  return "<p>Just type the numbers themselves, one by one. <BR> So far you have typed the following: </p>" + fullResponse.toString().replace(/,/g, ', ');
+			},
+			trial_duration: 500,
+			
+			on_finish: function (data) {			
+				console.log("Trail ended. DETAILS: Response for digit " + currentDigit.toString() + ": " + JSON.stringify(currentResponse) + ", fullResponse = " + JSON.stringify(fullResponse) + " totalTrialRT = " + totalTrialRT.toString());
+				//Now that we have the full sequence, we can evaluate if it's correct and save it.	
+				response = fullResponse;
+				rt_history.push(totalTrialRT);
+				console.log('responses and RT: ', response, rt_history);
 
+				//If this is the first set of the current number of digits, then reset the count of the incorrect responses so that we're counting incorrect for this current set.
+				//The array that keeps track of which set of digits has been shown for each number of digits (SequencePairOrder) is checked for which set of digits (first or second) has been shown for the current number of digits (subtracting 2 because that array starts at 0 instead of 2). Since the value starts out as 1 or 2 and then 3 is added when the digits have been shown for the current set, it will be 4 or 5 after the first set has been shown.
+				if ((SequencePairOrder[currentNumberDigits-2] == 4) && (SequencePairOrder[currentNumberDigits-2] == 5)) { 
+					currentIncorrect = 0;
+				}
+				console.log('After participant has entered their answer, currentIncorrect: ', currentIncorrect);
+
+				reversedResponse = response.reverse();
+				var correct = arraysEqual(reversedResponse, curr_stimSeq);
+				corr_history.push(correct);
+				if (correct) {
+					feedback = '<span style="color:green">Correct!</span>';
+					if (max_level < digit_sequence[corr_history.length]) {
+						max_level = digit_sequence[corr_history.length];
+					}
+				} else {
+					feedback = '<span style="color:red">Incorrect</span>';
+					currentIncorrect = currentIncorrect + 1;
+					console.log('After answer found to be incorrect, currentIncorrect: ', currentIncorrect);
+				}
+				digit_history.push(currentNumberDigits);
+				jsPsych.data.addDataToLastTrial({
+					"stimSeq": curr_stimSeq,
+					"condition": "reverse",
+					"correct": correct,
+					"sequenceEntered": fullResponse
+				});
+
+				//Now that we're done with the currently entered sequence from the participant, clear it for the next trial.
+				fullResponse = [];
+
+			}
+		};
+		block_sequence.push(AfterFinalDigitFromParticipant);
+		
         // feedback, click to continue
         var feedback_page = {
             type: 'instructions',
@@ -596,7 +614,14 @@ function generate_backward_block_fixed(digit_sequence) {
             show_page_number: false,
             data: {
                 exp_stage: "feedback_page_" + ii.toString()
-            }
+            },
+			on_finish: function (data) {
+				//If they get one or more wrong in the set of sequences for the current number of digits, end the memory task
+				if ((currentIncorrect > 1) && (SequencePairOrder[currentNumberDigits-2] >= 7)) { //If you have two (or more) wrong and you've done both trials in a set, then send the experiment.
+					jsPsych.endExperiment('(Done. This text will be removed for final version.)'); // message was "The experiment was ended due to a wrong answer"
+					console.log('Ending experiment due to a wrong answer.');
+				}
+			}
         };
         block_sequence.push(feedback_page);
     }

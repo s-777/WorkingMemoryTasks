@@ -97,7 +97,7 @@ p {
     margin: 0 auto;
     margin-bottom: 1em;
     font-size: 3vh;
-    line-height: 130%;
+    line-height: 200%;
 }
 
 /* used for large text shown in the center of the screen, like FB or stimuli */
@@ -107,6 +107,7 @@ p {
     font-size: 40px;
     position: relative;
     top: 50%;
+    line-height: 200%;
 /* 
     -ms-transform: translateY(-50%);
     -webkit-transform: translateY(-50%);
